@@ -18,11 +18,14 @@ async def main() -> None:
     if not settings.bot_token:
         raise RuntimeError("BOT_TOKEN is empty — fill .env / Amvera variables")
 
-    if settings.database_url:
-        await db.init_pool(settings.database_url)
+    dsn = settings.dsn
+    if dsn:
+        await db.init_pool(dsn)
         log.info("Postgres pool initialised; schema ensured")
     else:
-        log.warning("DATABASE_URL is empty — running without DB; events go to logs only")
+        log.warning(
+            "DATABASE_URL/компоненты не заданы — работаем без БД; события только в лог"
+        )
 
     bot = Bot(token=settings.bot_token)
     dp = Dispatcher()

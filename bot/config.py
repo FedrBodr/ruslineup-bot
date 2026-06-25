@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 
@@ -10,7 +11,15 @@ load_dotenv()
 class Settings:
     bot_token: str = os.getenv("BOT_TOKEN", "")
     admin_chat_id: str = os.getenv("ADMIN_CHAT_ID", "")
+
+    # PostgreSQL — либо готовый DATABASE_URL, либо компоненты (Amvera отдаёт по частям).
     database_url: str = os.getenv("DATABASE_URL", "")
+    database_host: str = os.getenv("DATABASE_HOST", "")
+    database_port: str = os.getenv("DATABASE_PORT", "5432")
+    database_user: str = os.getenv("DATABASE_USER", "")
+    database_password: str = os.getenv("DATABASE_PASSWORD", "")
+    database_name: str = os.getenv("DATABASE_NAME", "")
+
     llm_api_key: str = os.getenv("LLM_API_KEY", "")
     llm_model: str = os.getenv("LLM_MODEL", "")
 
@@ -28,6 +37,20 @@ class Settings:
 
     # Тест-день (этап 4). В v1 фикс. цены нет — бот говорит «уточняйте у менеджера».
     testday_price: str = os.getenv("TESTDAY_PRICE", "")
+
+    @property
+    def dsn(self) -> str:
+        """DSN для asyncpg. Приоритет — DATABASE_URL; иначе собираем из компонентов."""
+        if self.database_url:
+            return self.database_url
+        if self.database_host and self.database_user:
+            password = quote(self.database_password, safe="")
+            name = self.database_name or self.database_user
+            return (
+                f"postgresql://{self.database_user}:{password}"
+                f"@{self.database_host}:{self.database_port}/{name}"
+            )
+        return ""
 
 
 settings = Settings()
