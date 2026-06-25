@@ -1,4 +1,4 @@
-"""PostgreSQL data layer (asyncpg). Source of truth for метрики и заявки.
+"""PostgreSQL data layer (asyncpg). Source of truth for метрики, заявки и промокоды.
 
 The pool is held module-level and injected via `set_pool` so unit tests can
 substitute a fake pool with no live database. All write helpers are no-ops when
@@ -47,12 +47,41 @@ CREATE TABLE IF NOT EXISTS users (
 )
 """
 
+CREATE_LEADS = """
+CREATE TABLE IF NOT EXISTS leads (
+    id          BIGSERIAL PRIMARY KEY,
+    ts          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    user_id     BIGINT,
+    username    TEXT,
+    name        TEXT,
+    city        TEXT,
+    contact     TEXT,
+    type        TEXT,
+    comment     TEXT,
+    utm_source  TEXT,
+    status      TEXT DEFAULT 'new'
+)
+"""
+
+CREATE_PROMO = """
+CREATE TABLE IF NOT EXISTS promo (
+    code        TEXT UNIQUE,
+    user_id     BIGINT PRIMARY KEY,
+    username    TEXT,
+    issued_at   TIMESTAMPTZ DEFAULT now(),
+    status      TEXT DEFAULT 'issued',
+    sale_amount NUMERIC
+)
+"""
+
 
 async def init_schema() -> None:
     """Create tables if they do not exist (idempotent)."""
     async with get_pool().acquire() as conn:
         await conn.execute(CREATE_EVENTS)
         await conn.execute(CREATE_USERS)
+        await conn.execute(CREATE_LEADS)
+        await conn.execute(CREATE_PROMO)
 
 
 async def init_pool(dsn: str) -> None:
@@ -106,5 +135,50 @@ async def get_user_utm(user_id: int) -> Optional[str]:
     if _pool is None:
         return None
     sql = "SELECT utm_source FROM users WHERE user_id = $1"
+    async with _pool.acquire() as conn:
+        return await conn.fetchval(sql, user_id)
+
+
+async def insert_lead(
+    *,
+    user_id: int,
+    username: Optional[str],
+    name: str,
+    city: str,
+    contact: str,
+    lead_type: str,
+    comment: str,
+    utm_source: str = "",
+) -> None:
+    """Insert one row into `leads`. No-op if the pool is unset."""
+    if _pool is None:
+        return
+    sql = (
+        "INSERT INTO leads(user_id, username, name, city, contact, type, comment, utm_source) "
+        "VALUES($1, $2, $3, $4, $5, $6, $7, $8)"
+    )
+    async with _pool.acquire() as conn:
+        await conn.execute(
+            sql, user_id, username, name, city, contact, lead_type, comment, utm_source
+        )
+
+
+async def insert_promo(*, code: str, user_id: int, username: Optional[str]) -> None:
+    """Сохранить промокод пользователя один раз. No-op если пул не задан."""
+    if _pool is None:
+        return
+    sql = (
+        "INSERT INTO promo(code, user_id, username) VALUES($1, $2, $3) "
+        "ON CONFLICT (user_id) DO NOTHING"
+    )
+    async with _pool.acquire() as conn:
+        await conn.execute(sql, code, user_id, username)
+
+
+async def get_promo_code(user_id: int) -> Optional[str]:
+    """Вернуть сохранённый промокод пользователя, либо None."""
+    if _pool is None:
+        return None
+    sql = "SELECT code FROM promo WHERE user_id = $1"
     async with _pool.acquire() as conn:
         return await conn.fetchval(sql, user_id)

@@ -25,6 +25,7 @@ dist/
 
 # staging / scratch
 /.tmp/
+.claude/worktrees/
 
 # OS
 .DS_Store

@@ -70,6 +70,51 @@ async def test_init_schema_creates_tables():
     ddl = " ".join(c.args[0] for c in conn.execute.await_args_list)
     assert "CREATE TABLE IF NOT EXISTS events" in ddl
     assert "CREATE TABLE IF NOT EXISTS users" in ddl
+    assert "CREATE TABLE IF NOT EXISTS leads" in ddl
+
+
+@pytest.mark.asyncio
+async def test_insert_lead_inserts_row():
+    conn = FakeConn()
+    db.set_pool(FakePool(conn))
+    await db.insert_lead(
+        user_id=42,
+        username="neo",
+        name="Нео",
+        city="Москва",
+        contact="+79990001122",
+        lead_type="testday",
+        comment="хочу на выходных",
+        utm_source="youtube",
+    )
+    assert conn.execute.await_count == 1
+    args = conn.execute.await_args.args
+    assert "INSERT INTO leads" in args[0]
+    assert args[1:9] == (
+        42,
+        "neo",
+        "Нео",
+        "Москва",
+        "+79990001122",
+        "testday",
+        "хочу на выходных",
+        "youtube",
+    )
+
+
+@pytest.mark.asyncio
+async def test_insert_lead_noop_without_pool():
+    db.set_pool(None)
+    # Должно тихо ничего не делать, без исключения.
+    await db.insert_lead(
+        user_id=1,
+        username=None,
+        name="A",
+        city="B",
+        contact="C",
+        lead_type="preorder",
+        comment="",
+    )
 
 
 def test_get_pool_raises_when_unset():

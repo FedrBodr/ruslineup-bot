@@ -5,7 +5,7 @@ from aiogram import Bot, Dispatcher
 
 import bot.services.db as db
 from bot.config import settings
-from bot.handlers import start
+from bot.handlers import faq, lead, promo, start
 
 
 async def main() -> None:
@@ -27,6 +27,9 @@ async def main() -> None:
     bot = Bot(token=settings.bot_token)
     dp = Dispatcher()
     dp.include_router(start.router)
+    dp.include_router(faq.router)
+    dp.include_router(lead.router)
+    dp.include_router(promo.router)
 
     log.info("Bot started (polling)")
     try:
