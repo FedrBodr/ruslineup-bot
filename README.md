@@ -29,32 +29,43 @@ DATABASE_URL=postgresql://... PYTHONPATH=. pytest tests/test_db_integration.py -
 
 ## Деплой на Amvera
 
-1. Создать приложение в Amvera (тип — Python), подключить этот git-репозиторий.
-2. Конфиг уже в `amvera.yml` (запуск `python -m bot`, polling).
-3. Секреты задать в разделе «Переменные и секреты» Amvera (НЕ в git): `BOT_TOKEN`, `ADMIN_CHAT_ID`, `DATABASE_URL`, `PARTNER_NICK`, `LLM_API_KEY`, `LLM_MODEL`.
-4. `git push` в Amvera-remote (или авто-сборка при push в GitHub) → сборка и запуск.
+1. Создать приложение в Amvera (тип — **Python 3.11**), подключить этот git-репозиторий (ветку для деплоя).
+2. Сборка/запуск — в `amvera.yml` (`pip` + `python -m bot`, long-polling). Persistent-диск не нужен: source of truth — внешний PostgreSQL.
+3. В «Переменные и секреты» Amvera (НЕ в git) задать:
+   - обязательные: `BOT_TOKEN`, `DATABASE_URL`, `ADMIN_CHAT_ID`
+   - промокоды/контент: `PARTNER_NICK`, `PARTNER_DISCOUNT`, `BOARD_12KW`, `BOARD_14KW`, `SEAT_KIT`, `BATTERY_1`, `BATTERY_2`, `PREORDER_TERMS`, `TESTDAY_PRICE`
+   - на этап 6 (AI): `LLM_API_KEY`, `LLM_MODEL`
+4. Деплой: `git push` в Amvera-remote (или авто-сборка при push в подключённую ветку GitHub).
+5. **Один инстанс** (long-polling): не запускать вторую реплику — Telegram отдаст `409 Conflict`. При старте бот сам снимает вебхук (`delete_webhook(drop_pending_updates=True)`).
+
+### Smoke-тест в проде (чек-лист)
+
+- [ ] `/start` → приветствие + меню; в `events` строка (event=`start`, верный `utm_source` из deep-link).
+- [ ] FAQ (доски/кампы/комьюнити) → тексты с подставленными из ENV ценами; лог `faq_click`.
+- [ ] Заявка (тест-день): имя→город→контакт→коммент → строка в `leads` + уведомление в `ADMIN_CHAT_ID`; лог `lead_submit`.
+- [ ] Промокод → `RL-XXXX` + ник/скидка из ENV; повтор даёт тот же код; строка в `promo`; лог `promo_issue`.
+- [ ] Логи Amvera без ошибок; БД поднялась (схема создалась).
 
 ## Структура
 
 ```
 bot/
-├── __main__.py        точка входа (polling)
+├── __main__.py        точка входа (polling) + init пула
 ├── config.py          чтение ENV
-├── keyboards.py       меню
-├── handlers/          start (готов), faq/lead/promo/ai — этапы 3-6
-├── services/          db + metrics + promocode (готовы), llm — этап 6
-└── content/           тексты FAQ, база знаний AI
+├── keyboards.py       главное меню
+├── handlers/          start · faq · lead · promo (готовы), ai — этап 6
+├── services/          db · metrics · promocode (готовы), llm — этап 6
+└── content/           тексты FAQ (faq.py), база знаний AI — этап 6
 tests/                 юнит-тесты (мок БД) + gated интеграционный
 ```
 
-Хранилище — **PostgreSQL** (asyncpg): таблицы `events`, `users` (+ `leads`, `promo`,
-`tokens` на следующих этапах). `DATABASE_URL` — только через ENV/секреты Amvera.
-```
+Хранилище — **PostgreSQL** (asyncpg): таблицы `events`, `users`, `leads`, `promo`
+(+ `tokens` на этапе 7). `DATABASE_URL` — только через ENV/секреты Amvera.
 
 ## Безопасность (репозиторий публичный)
 
-Секреты и чувствительные данные — только в ENV / переменных Amvera, не в коде. Цены, условия предзаказа, размер скидки партнёра и контакты подставляются из переменных (`BOARD_PRICE`, `PREORDER_TERMS`, `TESTDAY_PRICE`, `PARTNER_DISCOUNT`, `PARTNER_NICK`). Тексты FAQ и `knowledge.md` держим обобщёнными.
+Секреты и чувствительные данные — только в ENV / переменных Amvera, не в коде. Цены, условия предзаказа, размер скидки партнёра и контакты подставляются из переменных (`BOARD_12KW`, `BOARD_14KW`, `SEAT_KIT`, `BATTERY_1`, `BATTERY_2`, `PREORDER_TERMS`, `TESTDAY_PRICE`, `PARTNER_DISCOUNT`, `PARTNER_NICK`). Тексты FAQ и `knowledge.md` держим обобщёнными.
 
 ## Статус
 
-Готов **этап 1** (каркас + `/start` с меню) и **этап 2** (метрики в PostgreSQL: слой данных, лог событий в `events`, персист utm в `users`). Остальные этапы — см. `docs/CLAUDE_CODE_TASKS.md`.
+Готовы **этапы 1–5**: каркас + `/start`, метрики в PostgreSQL (`events`/`users`), FAQ-кнопки, заявки (FSM → `leads`), промокоды (`promo`). Этап 9 — деплой на Amvera. Этапы 6–8 (AI, сквозная аналитика, дашборд) — см. `docs/CLAUDE_CODE_TASKS.md`.

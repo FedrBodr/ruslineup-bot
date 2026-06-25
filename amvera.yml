@@ -8,5 +8,7 @@ build:
   requirementsPath: requirements.txt
 
 run:
+  # Точка входа — пакет bot (__main__.py), long-polling.
   command: python -m bot
-  persistenceMount: /data
+  # Состояние не храним на диске: source of truth — внешний управляемый PostgreSQL
+  # (DATABASE_URL в переменных Amvera). Persistent-mount не нужен.

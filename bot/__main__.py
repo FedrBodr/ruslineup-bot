@@ -31,6 +31,10 @@ async def main() -> None:
     dp.include_router(lead.router)
     dp.include_router(promo.router)
 
+    # Снимаем возможный вебхук и сбрасываем накопившийся бэклог — иначе при
+    # рестарте на Amvera long-polling может словить 409 Conflict.
+    await bot.delete_webhook(drop_pending_updates=True)
+
     log.info("Bot started (polling)")
     try:
         await dp.start_polling(bot)
