@@ -1,20 +1,46 @@
-"""Логирование событий. Этап 1 — в консоль. Этап 2 — в Google Sheets (лист events)."""
+"""Единая точка логирования событий. Пишет в Postgres (таблица `events`) + в лог.
+
+`log_event` — best-effort: сбой БД не должен ломать пользовательский флоу,
+поэтому запись обёрнута в try/except. utm_source приходит только на `/start`;
+для остальных событий он подтягивается из таблицы `users`.
+"""
 import logging
 from typing import Optional
 
-from aiogram.types import User
+import bot.services.db as db
 
 logger = logging.getLogger("metrics")
 
 
-def log_event(user: User, event: str, detail: str = "", utm: Optional[str] = None) -> None:
-    """Единая точка логирования. На этапе 2 здесь же — append_row в Google Sheets."""
+async def log_event(user, event: str, detail: str = "", utm: Optional[str] = None) -> None:
+    # На /start utm передаётся явно; иначе берём сохранённый источник пользователя.
+    try:
+        source = utm if utm is not None else await db.get_user_utm(user.id)
+    except Exception:
+        source = utm
+    source = source or ""
+
     logger.info(
         "event=%s user_id=%s username=%s detail=%r utm=%s",
         event,
         user.id,
         user.username,
         detail,
-        utm or "",
+        source,
     )
-    # TODO (этап 2): sheets.append_event(timestamp, user.id, user.username, utm, event, detail)
+
+    try:
+        await db.append_event(
+            user_id=user.id,
+            username=user.username,
+            utm_source=source,
+            event=event,
+            detail=detail,
+        )
+    except Exception:
+        logger.warning(
+            "append_event failed for event=%s user_id=%s (metrics best-effort)",
+            event,
+            user.id,
+            exc_info=True,
+        )
