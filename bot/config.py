@@ -40,11 +40,23 @@ class Settings:
 
     @property
     def dsn(self) -> str:
-        """DSN для asyncpg. Приоритет — DATABASE_URL; иначе собираем из компонентов."""
-        if self.database_url:
-            return self.database_url
+        """DSN для asyncpg.
+
+        Amvera отдаёт JDBC-URL (`jdbc:postgresql://host:port/db`) без логина/пароля, а
+        креды — отдельными переменными. Поэтому: снимаем префикс `jdbc:`, и если в URL
+        нет кредов (`@`) — вживляем `DATABASE_USER`/`DATABASE_PASSWORD`. Если URL пуст —
+        собираем из компонентов `DATABASE_HOST/PORT/USER/PASSWORD/NAME`.
+        """
+        password = quote(self.database_password, safe="")
+        url = self.database_url
+        if url.startswith("jdbc:"):
+            url = url[len("jdbc:"):]
+        if url:
+            if "@" not in url and self.database_user and "://" in url:
+                scheme, _, rest = url.partition("://")
+                return f"{scheme}://{self.database_user}:{password}@{rest}"
+            return url
         if self.database_host and self.database_user:
-            password = quote(self.database_password, safe="")
             name = self.database_name or self.database_user
             return (
                 f"postgresql://{self.database_user}:{password}"

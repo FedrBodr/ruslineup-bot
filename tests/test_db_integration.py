@@ -1,16 +1,23 @@
-"""Integration test against a real Postgres. Skipped unless DATABASE_URL is set.
+"""Integration test against a real Postgres. Explicit opt-in only.
 
-Run locally with:  DATABASE_URL=postgresql://... PYTHONPATH=. pytest tests/test_db_integration.py -v
-Uses the live schema; cleans up the rows it creates.
+Скипается, пока не задан RUN_DB_INTEGRATION=1 — чтобы тест НЕ запускался
+автоматически просто из-за наличия DATABASE_URL в .env (он может указывать на
+общий/боевой инстанс). Подключение идёт по `settings.dsn` (тот же, что в проде).
+
+Запуск против ВЫДЕЛЕННОЙ базы ruslineup:
+    RUN_DB_INTEGRATION=1 PYTHONPATH=. pytest tests/test_db_integration.py -v
+Использует живую схему; за собой чистит созданные строки.
 """
 import os
 
 import pytest
 
 import bot.services.db as db
+from bot.config import settings
 
 pytestmark = pytest.mark.skipif(
-    not os.getenv("DATABASE_URL"), reason="no DATABASE_URL — integration test skipped"
+    not os.getenv("RUN_DB_INTEGRATION"),
+    reason="set RUN_DB_INTEGRATION=1 (against a dedicated ruslineup DB) to run",
 )
 
 _TEST_USER_ID = -999_000_001  # negative id never collides with real Telegram users
@@ -18,7 +25,7 @@ _TEST_USER_ID = -999_000_001  # negative id never collides with real Telegram us
 
 @pytest.fixture
 async def pool():
-    await db.init_pool(os.environ["DATABASE_URL"])
+    await db.init_pool(settings.dsn)
     try:
         # clean any leftovers from a previous run
         async with db.get_pool().acquire() as conn:

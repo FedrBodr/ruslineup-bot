@@ -20,11 +20,12 @@ pip install -r requirements-dev.txt
 PYTHONPATH=. pytest -q
 ```
 
-Юнит-тесты мокают БД и не требуют Postgres. Интеграционный тест слоя данных
-запускается только при заданном `DATABASE_URL` (иначе пропускается):
+Юнит-тесты мокают БД и не требуют Postgres. Интеграционный тест слоя данных —
+**явный opt-in** (`RUN_DB_INTEGRATION=1`), чтобы не запускаться автоматически из-за
+`DATABASE_URL` в `.env`. Гонять только против **выделенной** базы `ruslineup`:
 
 ```bash
-DATABASE_URL=postgresql://... PYTHONPATH=. pytest tests/test_db_integration.py -v
+RUN_DB_INTEGRATION=1 PYTHONPATH=. pytest tests/test_db_integration.py -v
 ```
 
 ## Деплой на Amvera
