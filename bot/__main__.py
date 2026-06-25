@@ -3,6 +3,7 @@ import logging
 
 from aiogram import Bot, Dispatcher
 
+import bot.services.db as db
 from bot.config import settings
 from bot.handlers import start
 
@@ -12,15 +13,26 @@ async def main() -> None:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
+    log = logging.getLogger("bot")
+
     if not settings.bot_token:
         raise RuntimeError("BOT_TOKEN is empty — fill .env / Amvera variables")
+
+    if settings.database_url:
+        await db.init_pool(settings.database_url)
+        log.info("Postgres pool initialised; schema ensured")
+    else:
+        log.warning("DATABASE_URL is empty — running without DB; events go to logs only")
 
     bot = Bot(token=settings.bot_token)
     dp = Dispatcher()
     dp.include_router(start.router)
 
-    logging.getLogger("bot").info("Bot started (polling)")
-    await dp.start_polling(bot)
+    log.info("Bot started (polling)")
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await db.close_pool()
 
 
 if __name__ == "__main__":
