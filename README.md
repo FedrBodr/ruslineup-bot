@@ -2,7 +2,7 @@
 
 Telegram-бот бренда «Русский Лайнап»: приём заявок, AI-общение с клиентами (гибрид FAQ + LLM), выдача промокодов партнёра, сквозная аналитика. Полное ТЗ — `TZ_telegram_bot_v1.md` (в проекте «Русский лайнап»).
 
-**Стек:** Python 3.11 · aiogram 3 · Google Sheets (gspread) · деплой на Amvera из git.
+**Стек:** Python 3.11 · aiogram 3 · PostgreSQL (asyncpg) · деплой на Amvera из git.
 
 ## Запуск локально
 
@@ -16,15 +16,22 @@ python -m bot
 Тесты:
 
 ```bash
-pip install pytest
+pip install -r requirements-dev.txt
 PYTHONPATH=. pytest -q
+```
+
+Юнит-тесты мокают БД и не требуют Postgres. Интеграционный тест слоя данных
+запускается только при заданном `DATABASE_URL` (иначе пропускается):
+
+```bash
+DATABASE_URL=postgresql://... PYTHONPATH=. pytest tests/test_db_integration.py -v
 ```
 
 ## Деплой на Amvera
 
 1. Создать приложение в Amvera (тип — Python), подключить этот git-репозиторий.
 2. Конфиг уже в `amvera.yml` (запуск `python -m bot`, polling).
-3. Секреты задать в разделе «Переменные и секреты» Amvera (НЕ в git): `BOT_TOKEN`, `ADMIN_CHAT_ID`, `SHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `PARTNER_NICK`, `LLM_API_KEY`, `LLM_MODEL`.
+3. Секреты задать в разделе «Переменные и секреты» Amvera (НЕ в git): `BOT_TOKEN`, `ADMIN_CHAT_ID`, `DATABASE_URL`, `PARTNER_NICK`, `LLM_API_KEY`, `LLM_MODEL`.
 4. `git push` в Amvera-remote (или авто-сборка при push в GitHub) → сборка и запуск.
 
 ## Структура
@@ -35,9 +42,13 @@ bot/
 ├── config.py          чтение ENV
 ├── keyboards.py       меню
 ├── handlers/          start (готов), faq/lead/promo/ai — этапы 3-6
-├── services/          metrics, promocode (готовы), sheets/llm — этапы 2,6
+├── services/          db + metrics + promocode (готовы), llm — этап 6
 └── content/           тексты FAQ, база знаний AI
-tests/                 юнит-тесты
+tests/                 юнит-тесты (мок БД) + gated интеграционный
+```
+
+Хранилище — **PostgreSQL** (asyncpg): таблицы `events`, `users` (+ `leads`, `promo`,
+`tokens` на следующих этапах). `DATABASE_URL` — только через ENV/секреты Amvera.
 ```
 
 ## Безопасность (репозиторий публичный)
@@ -46,4 +57,4 @@ tests/                 юнит-тесты
 
 ## Статус
 
-Готов **этап 1** (каркас + `/start` с меню) и `promocode` с тестами. Остальные этапы — см. `docs/CLAUDE_CODE_TASKS.md`.
+Готов **этап 1** (каркас + `/start` с меню) и **этап 2** (метрики в PostgreSQL: слой данных, лог событий в `events`, персист utm в `users`). Остальные этапы — см. `docs/CLAUDE_CODE_TASKS.md`.
