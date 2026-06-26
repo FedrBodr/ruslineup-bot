@@ -24,6 +24,9 @@ def _authorized(header: str) -> bool:
 
 @web.middleware
 async def _auth_mw(request, handler):
+    # /health — без авторизации, чтобы health-проба Amvera не упёрлась в 401.
+    if request.path == "/health":
+        return await handler(request)
     if not _authorized(request.headers.get("Authorization", "")):
         return web.Response(
             status=401,
@@ -31,6 +34,10 @@ async def _auth_mw(request, handler):
             headers={"WWW-Authenticate": 'Basic realm="dashboard"'},
         )
     return await handler(request)
+
+
+async def _health(request):
+    return web.Response(text="ok")
 
 
 def render_html(s: Stats) -> str:
@@ -63,4 +70,5 @@ async def _index(request):
 def build_app() -> web.Application:
     app = web.Application(middlewares=[_auth_mw])
     app.router.add_get("/", _index)
+    app.router.add_get("/health", _health)
     return app

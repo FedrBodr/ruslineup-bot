@@ -34,6 +34,17 @@ async def test_requires_auth(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_health_no_auth(monkeypatch):
+    monkeypatch.setattr(web, "settings",
+                        types.SimpleNamespace(dashboard_user="a", dashboard_password="b"))
+    monkeypatch.setattr(web, "get_stats", AsyncMock(return_value=_sample()))
+    async with TestClient(TestServer(web.build_app())) as cli:
+        resp = await cli.get("/health")  # без авторизации
+        assert resp.status == 200
+        assert (await resp.text()) == "ok"
+
+
+@pytest.mark.asyncio
 async def test_ok_with_auth_and_masked(monkeypatch):
     monkeypatch.setattr(web, "settings",
                         types.SimpleNamespace(dashboard_user="a", dashboard_password="b"))

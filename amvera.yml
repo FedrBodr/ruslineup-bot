@@ -8,7 +8,10 @@ build:
   requirementsPath: requirements.txt
 
 run:
-  # Точка входа — пакет bot (__main__.py), long-polling.
+  # Точка входа — пакет bot (__main__.py): long-polling + веб-дашборд на 0.0.0.0.
   command: python -m bot
+  # Порт, на который Amvera форвардит внешний HTTPS. Должен совпадать с WEB_PORT
+  # приложения (дефолт 8080). Health-проба: GET /health → 200.
+  containerPort: 8080
   # Состояние не храним на диске: source of truth — внешний управляемый PostgreSQL
   # (DATABASE_URL в переменных Amvera). Persistent-mount не нужен.
