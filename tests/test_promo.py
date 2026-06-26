@@ -29,7 +29,7 @@ def test_generate_code_stable():
     first = generate_code(777)
     second = generate_code(777)
     assert first == second
-    assert first.startswith("RL-")
+    assert first.isdigit()
 
 
 async def test_promo_get_shows_code_nick_and_discount(monkeypatch):
@@ -88,6 +88,28 @@ async def test_promo_get_second_call_same_code(monkeypatch):
     code1 = cb1.message.edit_text.call_args.args[0]
     code2 = cb2.message.edit_text.call_args.args[0]
     assert code1 == code2
+
+
+async def test_promo_get_manager_button_prefills_code(monkeypatch):
+    """Кнопка «Написать менеджеру» открывает чат с заготовленным текстом и кодом."""
+    user = SimpleNamespace(id=777, username="rider")
+    monkeypatch.setattr(
+        promo,
+        "settings",
+        SimpleNamespace(partner_nick="@bestmanager", partner_discount="10%"),
+    )
+    monkeypatch.setattr(promo.db, "insert_promo", AsyncMock())
+    monkeypatch.setattr(promo, "log_event", AsyncMock())
+
+    callback = _make_callback(user)
+    await promo.on_promo_get(callback)
+
+    code = generate_code(777)
+    markup = callback.message.edit_text.call_args.kwargs["reply_markup"]
+    manager_btn = markup.inline_keyboard[0][0]
+    assert manager_btn.url.startswith("https://t.me/bestmanager?text=")
+    assert code in manager_btn.url  # код вшит в préfill (дефис не кодируется)
+    assert "%" in manager_btn.url  # текст приветствия url-энкодится
 
 
 async def test_insert_promo_noop_without_pool():

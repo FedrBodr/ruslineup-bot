@@ -3,8 +3,8 @@ from bot.services.promocode import generate_code
 
 def test_format():
     code = generate_code(12345678)
-    assert code.startswith("RL-")
-    assert len(code) == 7  # "RL-" + 4 символа
+    assert code.isdigit()
+    assert len(code) == 6
 
 
 def test_stable_per_user():
