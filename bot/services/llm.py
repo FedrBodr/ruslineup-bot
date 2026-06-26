@@ -37,3 +37,37 @@ def build_system_prompt() -> str:
         "can_answer=false, если не можешь ответить из этих данных.\n\n"
         f"=== БАЗА ЗНАНИЙ ===\n{_knowledge_text()}\n\n=== ФАКТЫ ===\n{facts}"
     )
+
+
+def _client():
+    from openai import AsyncOpenAI
+
+    return AsyncOpenAI(api_key=settings.llm_api_key)
+
+
+async def ask(user_id: int, question: str) -> tuple[str, bool]:
+    if not settings.llm_api_key:
+        return "", True
+    hist = _history.setdefault(user_id, deque(maxlen=_MAX_TURNS))
+    messages = [{"role": "system", "content": build_system_prompt()}]
+    messages += list(hist)
+    messages.append({"role": "user", "content": question})
+
+    resp = await _client().chat.completions.create(
+        model=settings.llm_model or "gpt-4o",
+        messages=messages,
+        response_format={"type": "json_object"},
+        temperature=0.3,
+    )
+    raw = (resp.choices[0].message.content or "").strip()
+    try:
+        data = json.loads(raw)
+        answer = str(data.get("answer", "")).strip()
+        escalated = not bool(data.get("can_answer", True))
+    except Exception:
+        answer, escalated = raw, False
+    if not answer:
+        escalated = True
+    hist.append({"role": "user", "content": question})
+    hist.append({"role": "assistant", "content": answer})
+    return answer, escalated
