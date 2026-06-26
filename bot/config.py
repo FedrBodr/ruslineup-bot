@@ -43,6 +43,9 @@ class Settings:
     dashboard_password: str = os.getenv("DASHBOARD_PASSWORD", "")
     web_port: int = int(os.getenv("WEB_PORT") or os.getenv("PORT") or "8080")
 
+    # AI-фолбэк (этап 6)
+    ai_daily_limit: int = int(os.getenv("AI_DAILY_LIMIT") or "20")
+
     @property
     def dsn(self) -> str:
         """DSN для asyncpg.

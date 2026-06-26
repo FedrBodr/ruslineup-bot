@@ -52,3 +52,9 @@ def test_dashboard_and_port_fields():
     assert s.dashboard_user == "admin"
     assert s.dashboard_password == "pw"
     assert s.web_port == 9000
+
+
+def test_ai_daily_limit_field():
+    from bot.config import Settings
+    assert Settings().ai_daily_limit == 20
+    assert Settings(ai_daily_limit=5).ai_daily_limit == 5
