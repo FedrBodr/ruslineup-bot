@@ -3,9 +3,12 @@ import logging
 
 from aiogram import Bot, Dispatcher
 
+from aiohttp import web as aioweb
+
 import bot.services.db as db
+from bot import web as dashboard
 from bot.config import settings
-from bot.handlers import faq, lead, promo, start
+from bot.handlers import faq, lead, promo, start, stats
 
 
 async def main() -> None:
@@ -33,6 +36,17 @@ async def main() -> None:
     dp.include_router(faq.router)
     dp.include_router(lead.router)
     dp.include_router(promo.router)
+    dp.include_router(stats.router)
+
+    # Веб-дашборд рядом с поллингом — только если заданы креды Basic-auth.
+    runner = None
+    if settings.dashboard_user and settings.dashboard_password:
+        runner = aioweb.AppRunner(dashboard.build_app())
+        await runner.setup()
+        await aioweb.TCPSite(runner, host="0.0.0.0", port=settings.web_port).start()
+        log.info("Web dashboard on :%s", settings.web_port)
+    else:
+        log.warning("DASHBOARD_USER/PASSWORD не заданы — веб-дашборд выключен")
 
     # Снимаем возможный вебхук и сбрасываем накопившийся бэклог — иначе при
     # рестарте на Amvera long-polling может словить 409 Conflict.
@@ -42,6 +56,8 @@ async def main() -> None:
     try:
         await dp.start_polling(bot)
     finally:
+        if runner is not None:
+            await runner.cleanup()
         await db.close_pool()
 
 
