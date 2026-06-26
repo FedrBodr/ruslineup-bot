@@ -182,3 +182,14 @@ async def get_promo_code(user_id: int) -> Optional[str]:
     sql = "SELECT code FROM promo WHERE user_id = $1"
     async with _pool.acquire() as conn:
         return await conn.fetchval(sql, user_id)
+
+
+async def count_today_event(user_id: int, event: str) -> int:
+    if _pool is None:
+        return 0
+    sql = (
+        "SELECT count(*) FROM events "
+        "WHERE user_id = $1 AND event = $2 AND ts::date = now()::date"
+    )
+    async with _pool.acquire() as conn:
+        return await conn.fetchval(sql, user_id, event) or 0

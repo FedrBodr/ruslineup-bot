@@ -121,3 +121,24 @@ def test_get_pool_raises_when_unset():
     db.set_pool(None)
     with pytest.raises(RuntimeError):
         db.get_pool()
+
+
+@pytest.mark.asyncio
+async def test_count_today_event():
+    conn = FakeConn()
+    conn.fetchval = AsyncMock(return_value=3)
+    db.set_pool(FakePool(conn))
+    try:
+        n = await db.count_today_event(7, "ask_ai")
+    finally:
+        db.set_pool(None)
+    assert n == 3
+    sql = conn.fetchval.await_args.args[0]
+    assert "event" in sql and "ts::date" in sql
+    assert conn.fetchval.await_args.args[1:] == (7, "ask_ai")
+
+
+@pytest.mark.asyncio
+async def test_count_today_event_no_pool():
+    db.set_pool(None)
+    assert await db.count_today_event(7, "ask_ai") == 0
