@@ -8,7 +8,7 @@ from aiohttp import web as aioweb
 import bot.services.db as db
 from bot import web as dashboard
 from bot.config import settings
-from bot.handlers import faq, lead, promo, start, stats
+from bot.handlers import ai, faq, lead, promo, start, stats
 
 
 async def main() -> None:
@@ -37,6 +37,7 @@ async def main() -> None:
     dp.include_router(lead.router)
     dp.include_router(promo.router)
     dp.include_router(stats.router)
+    dp.include_router(ai.router)
 
     # Веб-дашборд рядом с поллингом — только если заданы креды Basic-auth.
     runner = None
