@@ -38,6 +38,11 @@ class Settings:
     # Тест-день (этап 4). В v1 фикс. цены нет — бот говорит «уточняйте у менеджера».
     testday_price: str = os.getenv("TESTDAY_PRICE", "")
 
+    # Веб-дашборд (этап 8). DASHBOARD_PASSWORD — секрет, только ENV.
+    dashboard_user: str = os.getenv("DASHBOARD_USER", "")
+    dashboard_password: str = os.getenv("DASHBOARD_PASSWORD", "")
+    web_port: int = int(os.getenv("WEB_PORT") or os.getenv("PORT") or "8080")
+
     @property
     def dsn(self) -> str:
         """DSN для asyncpg.

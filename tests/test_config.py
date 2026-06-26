@@ -45,3 +45,10 @@ def test_dsn_from_components():
 
 def test_dsn_empty():
     assert Settings(database_url="", database_host="", database_user="").dsn == ""
+
+
+def test_dashboard_and_port_fields():
+    s = Settings(dashboard_user="admin", dashboard_password="pw", web_port=9000)
+    assert s.dashboard_user == "admin"
+    assert s.dashboard_password == "pw"
+    assert s.web_port == 9000
