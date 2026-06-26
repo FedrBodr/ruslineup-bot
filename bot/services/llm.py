@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections import deque
 from pathlib import Path
 
 from bot.config import settings
+
+logger = logging.getLogger("llm")
 
 _KNOWLEDGE_PATH = Path(__file__).resolve().parent.parent / "content" / "knowledge.md"
 _MAX_TURNS = 6
@@ -53,12 +56,19 @@ async def ask(user_id: int, question: str) -> tuple[str, bool]:
     messages += list(hist)
     messages.append({"role": "user", "content": question})
 
-    resp = await _client().chat.completions.create(
-        model=settings.llm_model or "gpt-4o",
-        messages=messages,
-        response_format={"type": "json_object"},
-        temperature=0.3,
-    )
+    # Сбой OpenAI (сеть/таймаут/429/неверная модель) не должен ломать хендлер —
+    # мягко эскалируем на менеджера, как в ветке «нет ключа».
+    try:
+        resp = await _client().chat.completions.create(
+            model=settings.llm_model or "gpt-4o",
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.3,
+        )
+    except Exception:
+        logger.warning("OpenAI ask failed — эскалация на менеджера", exc_info=True)
+        return "", True
+
     raw = (resp.choices[0].message.content or "").strip()
     try:
         data = json.loads(raw)

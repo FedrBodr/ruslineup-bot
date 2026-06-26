@@ -50,7 +50,35 @@ async def test_ask_parses_json(monkeypatch):
 async def test_ask_can_answer_false_escalates(monkeypatch):
     monkeypatch.setattr(llm, "settings", types.SimpleNamespace(llm_api_key="sk-x", llm_model="gpt-4o"))
     monkeypatch.setattr(llm, "build_system_prompt", lambda: "SYS")
-    monkeypatch.setattr(llm, "_client", lambda: _fake_client('{"answer": "", "can_answer": false}'))
+    # Непустой answer + can_answer=false → эскалация именно по флагу, не по пустому ответу.
+    monkeypatch.setattr(llm, "_client",
+                        lambda: _fake_client('{"answer": "Это вне моей темы", "can_answer": false}'))
     llm._history.clear()
     answer, escalated = await llm.ask(8, "когда конец света?")
+    assert answer == "Это вне моей темы"
     assert escalated is True
+
+
+@pytest.mark.asyncio
+async def test_ask_api_error_escalates(monkeypatch):
+    monkeypatch.setattr(llm, "settings", types.SimpleNamespace(llm_api_key="sk-x", llm_model="gpt-4o"))
+    monkeypatch.setattr(llm, "build_system_prompt", lambda: "SYS")
+    boom = types.SimpleNamespace(chat=types.SimpleNamespace(
+        completions=types.SimpleNamespace(create=AsyncMock(side_effect=RuntimeError("429")))))
+    monkeypatch.setattr(llm, "_client", lambda: boom)
+    llm._history.clear()
+    answer, escalated = await llm.ask(5, "вопрос")
+    assert answer == "" and escalated is True
+    # При сбое API ничего не сохраняем в память.
+    assert 5 not in llm._history or len(llm._history[5]) == 0
+
+
+@pytest.mark.asyncio
+async def test_ask_memory_capped(monkeypatch):
+    monkeypatch.setattr(llm, "settings", types.SimpleNamespace(llm_api_key="sk-x", llm_model="gpt-4o"))
+    monkeypatch.setattr(llm, "build_system_prompt", lambda: "SYS")
+    monkeypatch.setattr(llm, "_client", lambda: _fake_client('{"answer": "ok", "can_answer": true}'))
+    llm._history.clear()
+    for i in range(10):
+        await llm.ask(99, f"q{i}")
+    assert len(llm._history[99]) == 6  # deque(maxlen=6)
