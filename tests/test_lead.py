@@ -53,13 +53,13 @@ async def test_entry_sets_type_and_asks_name():
 
 
 @pytest.mark.asyncio
-async def test_entry_preorder_no_testday_text():
+async def test_entry_partner_order_no_testday_text():
     state = make_state()
-    cb = make_callback("lead:preorder")
+    cb = make_callback("lead:partner_order")
 
     await lead.lead_entry(cb, state)
 
-    assert state.update_data.await_args.kwargs["lead_type"] == "preorder"
+    assert state.update_data.await_args.kwargs["lead_type"] == "partner_order"
     sent = " ".join(c.args[0] for c in cb.message.answer.await_args_list)
     assert "Тест-день" not in sent
 
@@ -141,7 +141,7 @@ async def test_finish_skip_comment(monkeypatch):
 
     state = make_state(
         {
-            "lead_type": "preorder",
+            "lead_type": "partner_order",
             "name": "Нео",
             "city": "Москва",
             "contact": "+79990001122",

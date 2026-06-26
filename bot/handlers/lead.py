@@ -30,17 +30,15 @@ class LeadForm(StatesGroup):
     waiting_comment = State()
 
 
-# callback_data → значение в leads.type. Расширяется на следующих этапах.
+# callback_data → значение в leads.type. preorder добавим отдельной темой позже.
 LEAD_TYPES = {
     "lead:testday": "testday",
-    "lead:preorder": "preorder",
     "lead:partner_order": "partner_order",
 }
 
 # Человекочитаемые ярлыки для уведомления админа (raw-тип тоже подставляем).
 TYPE_LABELS = {
     "testday": "Тест-день",
-    "preorder": "Предзаказ доски",
     "partner_order": "Заказ у партнёра",
 }
 

@@ -58,10 +58,10 @@ async def test_boards(monkeypatch):
     assert "ЦЕНА-СИДЕНЬЕ" in text
     assert "ЦЕНА-БАТ1" in text
     assert "ЦЕНА-БАТ2" in text
-    assert "УСЛОВИЯ-ПРЕДЗАКАЗА" in text
+    assert "Предзаказ" not in text  # предзаказ убран из раздела досок (добавим позже)
 
     datas = _callback_datas(markup)
-    assert datas == ["lead:testday", "lead:preorder", "promo:get", "menu:main"]
+    assert datas == ["lead:testday", "lead:partner_order", "promo:get", "menu:main"]
 
     log.assert_awaited_once()
     assert log.call_args.kwargs["event"] == "faq_click"
