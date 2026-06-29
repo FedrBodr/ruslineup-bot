@@ -6,9 +6,21 @@ from aiogram import Bot, Dispatcher
 from aiohttp import web as aioweb
 
 import bot.services.db as db
+import bot.services.metrika as metrika
 from bot import web as dashboard
 from bot.config import settings
 from bot.handlers import ai, faq, lead, promo, start, stats
+
+
+async def _metrika_uploader() -> None:
+    while True:
+        await asyncio.sleep(settings.ym_upload_interval)
+        try:
+            n = await metrika.upload_pending()
+            if n:
+                logging.getLogger("metrika").info("Uploaded %s conversions to Metrika", n)
+        except Exception:
+            logging.getLogger("metrika").warning("uploader tick failed", exc_info=True)
 
 
 async def main() -> None:
@@ -49,6 +61,11 @@ async def main() -> None:
     else:
         log.warning("DASHBOARD_USER/PASSWORD не заданы — веб-дашборд выключен")
 
+    uploader = None
+    if settings.ym_oauth_token and settings.ym_counter_id:
+        uploader = asyncio.create_task(_metrika_uploader())
+        log.info("Metrika uploader started (interval %ss)", settings.ym_upload_interval)
+
     # Снимаем возможный вебхук и сбрасываем накопившийся бэклог — иначе при
     # рестарте на Amvera long-polling может словить 409 Conflict.
     await bot.delete_webhook(drop_pending_updates=True)
@@ -57,6 +74,8 @@ async def main() -> None:
     try:
         await dp.start_polling(bot)
     finally:
+        if uploader is not None:
+            uploader.cancel()
         if runner is not None:
             await runner.cleanup()
         await db.close_pool()
