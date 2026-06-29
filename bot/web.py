@@ -5,6 +5,7 @@ from html import escape
 
 from aiohttp import web
 
+import bot.services.db as db
 from bot.config import settings
 from bot.services.stats import Stats, get_stats
 
@@ -24,8 +25,8 @@ def _authorized(header: str) -> bool:
 
 @web.middleware
 async def _auth_mw(request, handler):
-    # /health — без авторизации, чтобы health-проба Amvera не упёрлась в 401.
-    if request.path == "/health":
+    # /health и /api/token — без авторизации.
+    if request.path in ("/health", "/api/token"):
         return await handler(request)
     if not _authorized(request.headers.get("Authorization", "")):
         return web.Response(
@@ -38,6 +39,35 @@ async def _auth_mw(request, handler):
 
 async def _health(request):
     return web.Response(text="ok")
+
+
+def _cors_headers() -> dict:
+    return {
+        "Access-Control-Allow-Origin": settings.site_origin,
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+    }
+
+
+async def _register_token(request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    token = secrets.token_hex(6)
+    await db.insert_token(
+        token=token,
+        ga4_cid=body.get("ga4_cid"),
+        ym_cid=body.get("ym_cid"),
+        utm_source=body.get("utm_source"),
+        utm_medium=body.get("utm_medium"),
+        utm_campaign=body.get("utm_campaign"),
+    )
+    return web.json_response({"token": token}, headers=_cors_headers())
+
+
+async def _token_options(request):
+    return web.Response(status=204, headers=_cors_headers())
 
 
 _STYLE = """
@@ -120,4 +150,6 @@ def build_app() -> web.Application:
     app = web.Application(middlewares=[_auth_mw])
     app.router.add_get("/", _index)
     app.router.add_get("/health", _health)
+    app.router.add_post("/api/token", _register_token)
+    app.router.add_options("/api/token", _token_options)
     return app

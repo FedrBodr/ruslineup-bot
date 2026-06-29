@@ -56,3 +56,22 @@ async def test_ok_with_auth_and_masked(monkeypatch):
         assert "100" in html and "25" in html
         assert "+7926***3341" in html
         assert "5803341" not in html  # полный телефон НЕ светится
+
+
+@pytest.mark.asyncio
+async def test_api_token_public_with_cors(monkeypatch):
+    monkeypatch.setattr(web, "settings", types.SimpleNamespace(
+        dashboard_user="a", dashboard_password="b", site_origin="https://russianlineup.ru"))
+    insert = AsyncMock()
+    monkeypatch.setattr(web.db, "insert_token", insert)
+    async with TestClient(TestServer(web.build_app())) as cli:
+        resp = await cli.post("/api/token", json={"ga4_cid": "g", "ym_cid": "y",
+                                                  "utm_source": "youtube"})
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["token"] and len(data["token"]) == 12
+        assert resp.headers["Access-Control-Allow-Origin"] == "https://russianlineup.ru"
+        opt = await cli.options("/api/token")
+        assert opt.status == 204
+    insert.assert_awaited_once()
+    assert insert.await_args.kwargs["ga4_cid"] == "g"
