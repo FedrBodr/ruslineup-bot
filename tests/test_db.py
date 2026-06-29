@@ -142,3 +142,40 @@ async def test_count_today_event():
 async def test_count_today_event_no_pool():
     db.set_pool(None)
     assert await db.count_today_event(7, "ask_ai") == 0
+
+
+@pytest.mark.asyncio
+async def test_insert_and_get_token():
+    conn = FakeConn()
+    conn.fetchrow = AsyncMock(return_value={"token": "abc", "ga4_cid": "g", "ym_cid": "y",
+        "utm_source": "youtube", "utm_medium": "video", "utm_campaign": "c1"})
+    db.set_pool(FakePool(conn))
+    try:
+        await db.insert_token(token="abc", ga4_cid="g", ym_cid="y",
+            utm_source="youtube", utm_medium="video", utm_campaign="c1")
+        assert "INSERT INTO tokens" in conn.execute.await_args.args[0]
+        tok = await db.get_token("abc")
+    finally:
+        db.set_pool(None)
+    assert tok["ga4_cid"] == "g" and tok["utm_source"] == "youtube"
+
+
+@pytest.mark.asyncio
+async def test_set_and_get_user_cids():
+    conn = FakeConn()
+    conn.fetchrow = AsyncMock(return_value={"ga4_cid": "g1", "ym_cid": "y1"})
+    db.set_pool(FakePool(conn))
+    try:
+        await db.set_user_cids(user_id=7, ga4_cid="g1", ym_cid="y1")
+        assert "UPDATE users" in conn.execute.await_args.args[0]
+        cids = await db.get_user_cids(7)
+    finally:
+        db.set_pool(None)
+    assert cids == {"ga4_cid": "g1", "ym_cid": "y1"}
+
+
+@pytest.mark.asyncio
+async def test_token_helpers_no_pool():
+    db.set_pool(None)
+    assert await db.get_token("x") is None
+    assert await db.get_user_cids(1) == {"ga4_cid": None, "ym_cid": None}

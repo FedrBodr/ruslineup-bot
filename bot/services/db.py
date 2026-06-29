@@ -74,6 +74,19 @@ CREATE TABLE IF NOT EXISTS promo (
 )
 """
 
+CREATE_TOKENS = """
+CREATE TABLE IF NOT EXISTS tokens (
+    token        TEXT PRIMARY KEY,
+    ga4_cid      TEXT,
+    ym_cid       TEXT,
+    utm_source   TEXT,
+    utm_medium   TEXT,
+    utm_campaign TEXT,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    user_id      BIGINT
+)
+"""
+
 
 async def init_schema() -> None:
     """Create tables if they do not exist (idempotent)."""
@@ -82,6 +95,9 @@ async def init_schema() -> None:
         await conn.execute(CREATE_USERS)
         await conn.execute(CREATE_LEADS)
         await conn.execute(CREATE_PROMO)
+        await conn.execute(CREATE_TOKENS)
+        await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS ga4_cid TEXT")
+        await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS ym_cid TEXT")
 
 
 async def init_pool(dsn: str) -> None:
@@ -193,3 +209,46 @@ async def count_today_event(user_id: int, event: str) -> int:
     )
     async with _pool.acquire() as conn:
         return await conn.fetchval(sql, user_id, event) or 0
+
+
+async def insert_token(*, token, ga4_cid, ym_cid, utm_source, utm_medium, utm_campaign) -> None:
+    if _pool is None:
+        return
+    sql = ("INSERT INTO tokens(token, ga4_cid, ym_cid, utm_source, utm_medium, utm_campaign) "
+           "VALUES($1, $2, $3, $4, $5, $6) ON CONFLICT (token) DO NOTHING")
+    async with _pool.acquire() as conn:
+        await conn.execute(sql, token, ga4_cid, ym_cid, utm_source, utm_medium, utm_campaign)
+
+
+async def get_token(token: str):
+    if _pool is None:
+        return None
+    sql = ("SELECT token, ga4_cid, ym_cid, utm_source, utm_medium, utm_campaign "
+           "FROM tokens WHERE token = $1")
+    async with _pool.acquire() as conn:
+        row = await conn.fetchrow(sql, token)
+        return dict(row) if row else None
+
+
+async def link_token_user(*, token: str, user_id: int) -> None:
+    if _pool is None:
+        return
+    async with _pool.acquire() as conn:
+        await conn.execute("UPDATE tokens SET user_id = $2 WHERE token = $1", token, user_id)
+
+
+async def set_user_cids(*, user_id: int, ga4_cid, ym_cid) -> None:
+    if _pool is None:
+        return
+    sql = ("UPDATE users SET ga4_cid = COALESCE($2, ga4_cid), ym_cid = COALESCE($3, ym_cid) "
+           "WHERE user_id = $1")
+    async with _pool.acquire() as conn:
+        await conn.execute(sql, user_id, ga4_cid, ym_cid)
+
+
+async def get_user_cids(user_id: int) -> dict:
+    if _pool is None:
+        return {"ga4_cid": None, "ym_cid": None}
+    async with _pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT ga4_cid, ym_cid FROM users WHERE user_id = $1", user_id)
+        return dict(row) if row else {"ga4_cid": None, "ym_cid": None}
