@@ -5,7 +5,7 @@ Read-only поверх пула asyncpg (тот же `db._pool`). Без пул�
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import bot.services.db as db
 
@@ -38,10 +38,17 @@ class Stats:
     leads_by_type: list
     promo_total: int
     recent_leads: list
+    conv_total: int = 0
+    conv_uploaded: int = 0
+    conv_by_target: list = field(default_factory=list)
 
     @classmethod
     def empty(cls) -> "Stats":
         return cls(0, 0, 0, [], [], 0, [], 0, [])
+
+    @property
+    def conv_pending(self) -> int:
+        return max(0, self.conv_total - self.conv_uploaded)
 
     def _pct(self, n: int) -> str:
         if not self.starts_total:
@@ -82,6 +89,13 @@ async def get_stats() -> Stats:
             "coalesce(city,'') AS city, coalesce(type,'') AS type, coalesce(contact,'') AS contact, "
             "coalesce(utm_source,'') AS utm_source FROM leads ORDER BY ts DESC LIMIT 20")
 
+        conv_total = await conn.fetchval("SELECT count(*) FROM conversions") or 0
+        conv_uploaded = await conn.fetchval(
+            "SELECT count(*) FROM conversions WHERE uploaded = true") or 0
+        conv_by_target = await conn.fetch(
+            "SELECT coalesce(target,'') AS target, count(*) AS c "
+            "FROM conversions GROUP BY 1 ORDER BY c DESC")
+
     return Stats(
         starts_total=starts_total,
         starts_today=starts_today,
@@ -96,4 +110,7 @@ async def get_stats() -> Stats:
                  contact=mask_contact(r["contact"]), utm_source=r["utm_source"])
             for r in recent
         ],
+        conv_total=conv_total,
+        conv_uploaded=conv_uploaded,
+        conv_by_target=[(r["target"], r["c"]) for r in conv_by_target],
     )

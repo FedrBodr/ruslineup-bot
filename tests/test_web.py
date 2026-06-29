@@ -20,6 +20,7 @@ def _sample():
         leads_total=25, leads_by_type=[("testday", 20)], promo_total=10,
         recent_leads=[Lead("2026-06-26 03:38", "Дмитрий", "Москва",
                            "preorder", "+7926***3341", "direct")],
+        conv_total=4, conv_uploaded=1, conv_by_target=[("lead", 3)],
     )
 
 
@@ -56,6 +57,7 @@ async def test_ok_with_auth_and_masked(monkeypatch):
         assert "100" in html and "25" in html
         assert "+7926***3341" in html
         assert "5803341" not in html  # полный телефон НЕ светится
+        assert "Конверсии" in html  # секция конверсий рендерится
 
 
 @pytest.mark.asyncio

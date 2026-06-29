@@ -17,7 +17,8 @@ def render_text(s: Stats) -> str:
         f"Старты: {s.starts_total} (сегодня {s.starts_today}, 7 дней {s.starts_7d})\n"
         f"Источники: {src}\n"
         f"Заявки: {s.leads_total} ({types}) · конверсия start→lead {s.lead_conv()}\n"
-        f"Промокоды: {s.promo_total} · конверсия start→promo {s.promo_conv()}"
+        f"Промокоды: {s.promo_total} · конверсия start→promo {s.promo_conv()}\n"
+        f"Конверсии: {s.conv_total} (выгружено {s.conv_uploaded}, в очереди {s.conv_pending})"
     )
 
 

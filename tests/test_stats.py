@@ -51,13 +51,14 @@ class FakePool:
 
 @pytest.mark.asyncio
 async def test_get_stats_maps_and_masks():
-    vals = [100, 10, 40, 25, 15]  # starts_total, today, 7d, leads, promo
+    vals = [100, 10, 40, 25, 15, 4, 1]  # +conv_total, conv_uploaded
     rows = [
         [{"utm_source": "youtube", "c": 60}],
         [{"detail": "boards", "c": 30}],
         [{"type": "testday", "c": 20}],
         [{"ts": "2026-06-26 03:38", "name": "Дмитрий", "city": "Москва",
           "type": "preorder", "contact": "+79265803341", "utm_source": "direct"}],
+        [{"target": "lead", "c": 3}, {"target": "promo", "c": 1}],  # conv_by_target
     ]
     db.set_pool(FakePool(FakeConn(vals, rows)))
     try:
@@ -71,6 +72,9 @@ async def test_get_stats_maps_and_masks():
     assert s.starts_by_source == [("youtube", 60)]
     assert s.recent_leads[0].contact == "+7926***3341"  # замаскирован
     assert s.recent_leads[0].name == "Дмитрий"
+    assert s.conv_total == 4 and s.conv_uploaded == 1
+    assert s.conv_pending == 3
+    assert s.conv_by_target == [("lead", 3), ("promo", 1)]
 
 
 @pytest.mark.asyncio
