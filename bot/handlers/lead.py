@@ -17,6 +17,7 @@ from aiogram.types import (
 )
 
 import bot.services.db as db
+import bot.services.ga4 as ga4
 from bot.config import settings
 from bot.services.metrics import log_event
 
@@ -158,6 +159,10 @@ async def _finish(message: Message, state: FSMContext, comment: str) -> None:
     await message.bot.send_message(settings.admin_chat_id, summary)
 
     await log_event(user, event="lead_submit", detail=lead_type)
+
+    cids = await db.get_user_cids(user.id)
+    if cids.get("ga4_cid"):
+        await ga4.send_event(cids["ga4_cid"], "lead_submit", {"type": lead_type})
 
     await state.clear()
     await message.answer(CONFIRM, reply_markup=ReplyKeyboardRemove())

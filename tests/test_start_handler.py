@@ -51,12 +51,14 @@ async def test_cmd_start_token(monkeypatch):
     monkeypatch.setattr(start.db, "link_token_user", link)
     monkeypatch.setattr(start.db, "set_user_cids", setcids)
     monkeypatch.setattr(start.db, "upsert_user_utm", upsert)
+    sent = AsyncMock(); monkeypatch.setattr(start.ga4, "send_event", sent)
     user = SimpleNamespace(id=7, username="neo")
     message = SimpleNamespace(from_user=user, answer=AsyncMock())
     await start.cmd_start(message, SimpleNamespace(args="tok_deadbeef0000"))
     assert upsert.await_args.kwargs["utm_source"] == "youtube"
     assert setcids.await_args.kwargs == {"user_id": 7, "ga4_cid": "g1", "ym_cid": "y1"}
     link.assert_awaited_once()
+    assert sent.await_args.args[1] == "bot_start"
 
 
 @pytest.mark.asyncio

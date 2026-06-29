@@ -43,6 +43,8 @@ async def test_promo_get_shows_code_nick_and_discount(monkeypatch):
     log_mock = AsyncMock()
     monkeypatch.setattr(promo.db, "insert_promo", insert_mock)
     monkeypatch.setattr(promo, "log_event", log_mock)
+    monkeypatch.setattr(promo.db, "get_user_cids", AsyncMock(return_value={"ga4_cid": "g", "ym_cid": None}))
+    sent = AsyncMock(); monkeypatch.setattr(promo.ga4, "send_event", sent)
 
     callback = _make_callback(user)
     await promo.on_promo_get(callback)
@@ -67,6 +69,9 @@ async def test_promo_get_shows_code_nick_and_discount(monkeypatch):
     log_mock.assert_awaited_once()
     assert log_mock.call_args.kwargs["event"] == "promo_issue"
     assert log_mock.call_args.kwargs["detail"] == code
+
+    # GA4-событие.
+    assert sent.await_args.args[1] == "promo_issue"
 
 
 async def test_promo_get_second_call_same_code(monkeypatch):

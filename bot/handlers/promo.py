@@ -9,6 +9,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 
 import bot.services.db as db
+import bot.services.ga4 as ga4
 from bot.config import settings
 from bot.services.metrics import log_event
 from bot.services.promocode import generate_code
@@ -51,6 +52,9 @@ async def on_promo_get(callback: CallbackQuery) -> None:
     code = generate_code(user.id)
     await db.insert_promo(code=code, user_id=user.id, username=user.username)
     await log_event(user, event="promo_issue", detail=code)
+    cids = await db.get_user_cids(user.id)
+    if cids.get("ga4_cid"):
+        await ga4.send_event(cids["ga4_cid"], "promo_issue", {"code": code})
     await callback.message.edit_text(
         _promo_text(code),
         parse_mode="HTML",

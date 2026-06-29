@@ -92,8 +92,10 @@ async def test_finish_inserts_lead_notifies_admin_and_logs(monkeypatch):
     log = AsyncMock()
     monkeypatch.setattr(lead.db, "insert_lead", insert)
     monkeypatch.setattr(lead.db, "get_user_utm", AsyncMock(return_value="youtube"))
+    monkeypatch.setattr(lead.db, "get_user_cids", AsyncMock(return_value={"ga4_cid": "g", "ym_cid": None}))
     monkeypatch.setattr(lead, "log_event", log)
     monkeypatch.setattr(lead, "settings", SimpleNamespace(admin_chat_id="999"))
+    sent = AsyncMock(); monkeypatch.setattr(lead.ga4, "send_event", sent)
 
     state = make_state(
         {
@@ -125,6 +127,9 @@ async def test_finish_inserts_lead_notifies_admin_and_logs(monkeypatch):
     # Событие метрики.
     assert log.await_args.kwargs["event"] == "lead_submit"
     assert log.await_args.kwargs["detail"] == "testday"
+
+    # GA4-событие.
+    assert sent.await_args.args[1] == "lead_submit"
 
     # Состояние очищено, пользователю подтверждение.
     state.clear.assert_awaited_once()

@@ -3,6 +3,7 @@ from aiogram.filters import CommandObject, CommandStart
 from aiogram.types import Message
 
 import bot.services.db as db
+import bot.services.ga4 as ga4
 from bot.keyboards import main_menu
 from bot.services.metrics import log_event
 
@@ -35,5 +36,7 @@ async def cmd_start(message: Message, command: CommandObject) -> None:
         utm = args
     await db.upsert_user_utm(user_id=user.id, username=user.username, utm_source=utm)
     await db.set_user_cids(user_id=user.id, ga4_cid=ga4_cid, ym_cid=ym_cid)
+    if ga4_cid:
+        await ga4.send_event(ga4_cid, "bot_start", {"utm_source": utm})
     await log_event(user, event="start", detail="", utm=utm)
     await message.answer(WELCOME, reply_markup=main_menu())
