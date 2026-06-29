@@ -179,3 +179,19 @@ async def test_token_helpers_no_pool():
     db.set_pool(None)
     assert await db.get_token("x") is None
     assert await db.get_user_cids(1) == {"ga4_cid": None, "ym_cid": None}
+
+
+@pytest.mark.asyncio
+async def test_conversions_flow():
+    conn = FakeConn()
+    conn.fetch = AsyncMock(return_value=[{"id": 1, "ts": None, "ym_cid": "y", "target": "lead", "price": None}])
+    db.set_pool(FakePool(conn))
+    try:
+        await db.enqueue_conversion(user_id=7, ym_cid="y", target="lead")
+        assert "INSERT INTO conversions" in conn.execute.await_args.args[0]
+        rows = await db.fetch_pending_conversions()
+        assert rows[0]["target"] == "lead"
+        await db.mark_conversions_uploaded([1, 2])
+        assert "UPDATE conversions" in conn.execute.await_args.args[0]
+    finally:
+        db.set_pool(None)

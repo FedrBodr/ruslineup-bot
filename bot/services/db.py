@@ -87,6 +87,18 @@ CREATE TABLE IF NOT EXISTS tokens (
 )
 """
 
+CREATE_CONVERSIONS = """
+CREATE TABLE IF NOT EXISTS conversions (
+    id        BIGSERIAL PRIMARY KEY,
+    ts        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    user_id   BIGINT,
+    ym_cid    TEXT,
+    target    TEXT,
+    price     NUMERIC,
+    uploaded  BOOLEAN NOT NULL DEFAULT false
+)
+"""
+
 
 async def init_schema() -> None:
     """Create tables if they do not exist (idempotent)."""
@@ -98,6 +110,7 @@ async def init_schema() -> None:
         await conn.execute(CREATE_TOKENS)
         await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS ga4_cid TEXT")
         await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS ym_cid TEXT")
+        await conn.execute(CREATE_CONVERSIONS)
 
 
 async def init_pool(dsn: str) -> None:
@@ -252,3 +265,27 @@ async def get_user_cids(user_id: int) -> dict:
     async with _pool.acquire() as conn:
         row = await conn.fetchrow("SELECT ga4_cid, ym_cid FROM users WHERE user_id = $1", user_id)
         return dict(row) if row else {"ga4_cid": None, "ym_cid": None}
+
+
+async def enqueue_conversion(*, user_id: int, ym_cid: str, target: str, price=None) -> None:
+    if _pool is None:
+        return
+    sql = "INSERT INTO conversions(user_id, ym_cid, target, price) VALUES($1, $2, $3, $4)"
+    async with _pool.acquire() as conn:
+        await conn.execute(sql, user_id, ym_cid, target, price)
+
+
+async def fetch_pending_conversions(limit: int = 1000) -> list:
+    if _pool is None:
+        return []
+    sql = ("SELECT id, ts, ym_cid, target, price FROM conversions "
+           "WHERE uploaded = false AND ym_cid IS NOT NULL ORDER BY id LIMIT $1")
+    async with _pool.acquire() as conn:
+        return [dict(r) for r in await conn.fetch(sql, limit)]
+
+
+async def mark_conversions_uploaded(ids: list) -> None:
+    if _pool is None or not ids:
+        return
+    async with _pool.acquire() as conn:
+        await conn.execute("UPDATE conversions SET uploaded = true WHERE id = ANY($1)", ids)
