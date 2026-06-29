@@ -163,6 +163,8 @@ async def _finish(message: Message, state: FSMContext, comment: str) -> None:
     cids = await db.get_user_cids(user.id)
     if cids.get("ga4_cid"):
         await ga4.send_event(cids["ga4_cid"], "lead_submit", {"type": lead_type})
+    if cids.get("ym_cid"):
+        await db.enqueue_conversion(user_id=user.id, ym_cid=cids["ym_cid"], target="lead")
 
     await state.clear()
     await message.answer(CONFIRM, reply_markup=ReplyKeyboardRemove())

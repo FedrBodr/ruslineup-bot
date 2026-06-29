@@ -55,6 +55,8 @@ async def on_promo_get(callback: CallbackQuery) -> None:
     cids = await db.get_user_cids(user.id)
     if cids.get("ga4_cid"):
         await ga4.send_event(cids["ga4_cid"], "promo_issue", {"code": code})
+    if cids.get("ym_cid"):
+        await db.enqueue_conversion(user_id=user.id, ym_cid=cids["ym_cid"], target="promo")
     await callback.message.edit_text(
         _promo_text(code),
         parse_mode="HTML",
