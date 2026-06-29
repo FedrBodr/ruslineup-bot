@@ -46,6 +46,14 @@ class Settings:
     # AI-фолбэк (этап 6)
     ai_daily_limit: int = int(os.getenv("AI_DAILY_LIMIT") or "20")
 
+    # Сквозная аналитика (этап 7)
+    ga4_measurement_id: str = os.getenv("GA4_MEASUREMENT_ID", "G-6XY6XFGE6H")
+    ga4_api_secret: str = os.getenv("GA4_API_SECRET", "")
+    ym_counter_id: str = os.getenv("YM_COUNTER_ID", "110157768")
+    ym_oauth_token: str = os.getenv("YM_OAUTH_TOKEN", "")
+    ym_upload_interval: int = int(os.getenv("YM_UPLOAD_INTERVAL") or "1800")
+    site_origin: str = os.getenv("SITE_ORIGIN", "https://russianlineup.ru")
+
     @property
     def dsn(self) -> str:
         """DSN для asyncpg.

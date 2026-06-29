@@ -58,3 +58,15 @@ def test_ai_daily_limit_field():
     from bot.config import Settings
     assert Settings().ai_daily_limit == 20
     assert Settings(ai_daily_limit=5).ai_daily_limit == 5
+
+
+def test_analytics_fields():
+    from bot.config import Settings
+    s = Settings(ga4_api_secret="sec", ym_oauth_token="tok",
+                 ym_upload_interval=900, site_origin="https://x")
+    assert s.ga4_measurement_id == "G-6XY6XFGE6H"  # дефолт
+    assert s.ga4_api_secret == "sec"
+    assert s.ym_counter_id == "110157768"  # дефолт
+    assert s.ym_oauth_token == "tok"
+    assert s.ym_upload_interval == 900
+    assert s.site_origin == "https://x"
