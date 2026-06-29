@@ -31,3 +31,18 @@ async def test_upload_pending_noop_without_token(monkeypatch):
     fetch = AsyncMock(); monkeypatch.setattr(metrika.db, "fetch_pending_conversions", fetch)
     assert await metrika.upload_pending() == 0
     fetch.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_upload_pending_no_mark_on_failure(monkeypatch):
+    # если выгрузка не удалась — конверсии НЕ помечаем uploaded (повторим позже)
+    monkeypatch.setattr(metrika, "settings", types.SimpleNamespace(
+        ym_oauth_token="t", ym_counter_id="111"))
+    monkeypatch.setattr(metrika.db, "fetch_pending_conversions",
+                        AsyncMock(return_value=[{"id": 1, "ts": None, "ym_cid": "y",
+                                                 "target": "lead", "price": None}]))
+    monkeypatch.setattr(metrika, "_upload", AsyncMock(return_value=False))
+    mark = AsyncMock()
+    monkeypatch.setattr(metrika.db, "mark_conversions_uploaded", mark)
+    assert await metrika.upload_pending() == 0
+    mark.assert_not_awaited()

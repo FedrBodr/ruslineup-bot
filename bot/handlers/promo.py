@@ -3,6 +3,7 @@
 Выдаёт детерминированный промокод (один пользователь = один код), сохраняет его
 один раз в таблицу `promo` и показывает контакт партнёра со скидкой.
 """
+import logging
 from urllib.parse import quote
 
 from aiogram import F, Router
@@ -15,6 +16,7 @@ from bot.services.metrics import log_event
 from bot.services.promocode import generate_code
 
 router = Router()
+logger = logging.getLogger("promo")
 
 
 def _promo_text(code: str) -> str:
@@ -52,14 +54,18 @@ async def on_promo_get(callback: CallbackQuery) -> None:
     code = generate_code(user.id)
     await db.insert_promo(code=code, user_id=user.id, username=user.username)
     await log_event(user, event="promo_issue", detail=code)
-    cids = await db.get_user_cids(user.id)
-    if cids.get("ga4_cid"):
-        await ga4.send_event(cids["ga4_cid"], "promo_issue", {"code": code})
-    if cids.get("ym_cid"):
-        await db.enqueue_conversion(user_id=user.id, ym_cid=cids["ym_cid"], target="promo")
     await callback.message.edit_text(
         _promo_text(code),
         parse_mode="HTML",
         reply_markup=_promo_kb(code),
     )
     await callback.answer()
+    # Аналитика — best-effort, ПОСЛЕ ответа пользователю (сбой не ломает выдачу кода).
+    try:
+        cids = await db.get_user_cids(user.id)
+        if cids.get("ga4_cid"):
+            await ga4.send_event(cids["ga4_cid"], "promo_issue", {"code": code})
+        if cids.get("ym_cid"):
+            await db.enqueue_conversion(user_id=user.id, ym_cid=cids["ym_cid"], target="promo")
+    except Exception:
+        logger.warning("promo analytics failed (best-effort)", exc_info=True)

@@ -36,3 +36,12 @@ async def test_send_event_noop_without_client_id(monkeypatch):
     monkeypatch.setattr(ga4, "_post", post)
     await ga4.send_event("", "bot_start")
     post.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_send_event_swallows_post_error(monkeypatch):
+    # сбой исходящего POST не должен пробрасываться (best-effort)
+    monkeypatch.setattr(ga4, "settings", types.SimpleNamespace(
+        ga4_measurement_id="G-X", ga4_api_secret="sec"))
+    monkeypatch.setattr(ga4, "_post", AsyncMock(side_effect=RuntimeError("net")))
+    await ga4.send_event("cid", "bot_start")  # не должно бросать

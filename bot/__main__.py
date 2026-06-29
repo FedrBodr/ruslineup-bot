@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 
 from aiogram import Bot, Dispatcher
@@ -76,6 +77,8 @@ async def main() -> None:
     finally:
         if uploader is not None:
             uploader.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await uploader
         if runner is not None:
             await runner.cleanup()
         await db.close_pool()

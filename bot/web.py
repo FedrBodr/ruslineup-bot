@@ -54,14 +54,17 @@ async def _register_token(request):
         body = await request.json()
     except Exception:
         body = {}
+    def _s(v):
+        return str(v) if v is not None else None
+
     token = secrets.token_hex(6)
     await db.insert_token(
         token=token,
-        ga4_cid=body.get("ga4_cid"),
-        ym_cid=body.get("ym_cid"),
-        utm_source=body.get("utm_source"),
-        utm_medium=body.get("utm_medium"),
-        utm_campaign=body.get("utm_campaign"),
+        ga4_cid=_s(body.get("ga4_cid")),
+        ym_cid=_s(body.get("ym_cid")),
+        utm_source=_s(body.get("utm_source")),
+        utm_medium=_s(body.get("utm_medium")),
+        utm_campaign=_s(body.get("utm_campaign")),
     )
     return web.json_response({"token": token}, headers=_cors_headers())
 

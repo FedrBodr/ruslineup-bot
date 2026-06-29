@@ -88,6 +88,8 @@ async def test_promo_get_second_call_same_code(monkeypatch):
     )
     monkeypatch.setattr(promo.db, "insert_promo", AsyncMock())
     monkeypatch.setattr(promo, "log_event", AsyncMock())
+    monkeypatch.setattr(promo.db, "get_user_cids",
+                        AsyncMock(return_value={"ga4_cid": None, "ym_cid": None}))
 
     cb1 = _make_callback(user)
     cb2 = _make_callback(user)
@@ -109,6 +111,8 @@ async def test_promo_get_manager_button_prefills_code(monkeypatch):
     )
     monkeypatch.setattr(promo.db, "insert_promo", AsyncMock())
     monkeypatch.setattr(promo, "log_event", AsyncMock())
+    monkeypatch.setattr(promo.db, "get_user_cids",
+                        AsyncMock(return_value={"ga4_cid": None, "ym_cid": None}))
 
     callback = _make_callback(user)
     await promo.on_promo_get(callback)
@@ -149,3 +153,18 @@ async def test_insert_promo_executes_on_conflict():
     assert "INSERT INTO promo" in sql
     assert "ON CONFLICT (user_id) DO NOTHING" in sql
     assert conn.execute.call_args.args[1:] == ("RL-BBBB", 9, "n")
+
+
+async def test_promo_analytics_failure_still_replies(monkeypatch):
+    """Сбой аналитики (get_user_cids бросает) не мешает выдать код пользователю."""
+    user = SimpleNamespace(id=777, username="rider")
+    monkeypatch.setattr(promo, "settings",
+                        SimpleNamespace(partner_nick="@m", partner_discount="5%"))
+    monkeypatch.setattr(promo.db, "insert_promo", AsyncMock())
+    monkeypatch.setattr(promo, "log_event", AsyncMock())
+    monkeypatch.setattr(promo.db, "get_user_cids", AsyncMock(side_effect=RuntimeError("db down")))
+
+    callback = _make_callback(user)
+    await promo.on_promo_get(callback)  # не должно бросать
+
+    callback.message.edit_text.assert_awaited_once()  # пользователь получил код

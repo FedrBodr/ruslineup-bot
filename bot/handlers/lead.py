@@ -5,6 +5,8 @@
 админа и логирует событие. Тип заявки фиксируется входным callback и хранится в
 состоянии FSM.
 """
+import logging
+
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -22,6 +24,7 @@ from bot.config import settings
 from bot.services.metrics import log_event
 
 router = Router()
+logger = logging.getLogger("lead")
 
 
 class LeadForm(StatesGroup):
@@ -160,11 +163,15 @@ async def _finish(message: Message, state: FSMContext, comment: str) -> None:
 
     await log_event(user, event="lead_submit", detail=lead_type)
 
-    cids = await db.get_user_cids(user.id)
-    if cids.get("ga4_cid"):
-        await ga4.send_event(cids["ga4_cid"], "lead_submit", {"type": lead_type})
-    if cids.get("ym_cid"):
-        await db.enqueue_conversion(user_id=user.id, ym_cid=cids["ym_cid"], target="lead")
-
     await state.clear()
     await message.answer(CONFIRM, reply_markup=ReplyKeyboardRemove())
+
+    # Аналитика — best-effort, ПОСЛЕ ответа пользователю.
+    try:
+        cids = await db.get_user_cids(user.id)
+        if cids.get("ga4_cid"):
+            await ga4.send_event(cids["ga4_cid"], "lead_submit", {"type": lead_type})
+        if cids.get("ym_cid"):
+            await db.enqueue_conversion(user_id=user.id, ym_cid=cids["ym_cid"], target="lead")
+    except Exception:
+        logger.warning("lead analytics failed (best-effort)", exc_info=True)
