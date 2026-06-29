@@ -29,7 +29,7 @@ def test_generate_code_stable():
     first = generate_code(777)
     second = generate_code(777)
     assert first == second
-    assert first.isdigit()
+    assert first.startswith("RL_")
 
 
 async def test_promo_get_shows_code_nick_and_discount(monkeypatch):
